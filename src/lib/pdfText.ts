@@ -43,9 +43,12 @@ export function buildLines(items: TextItemLike[]): PageLines {
 }
 
 // Browser-side loader. Extracts lines for every page of a PDF file.
+// The legacy build is used deliberately: the standard pdfjs-dist v6 build
+// relies on very recent JavaScript features and throws
+// "undefined is not a function" on slightly older Safari.
 export async function extractPdfPages(data: ArrayBuffer): Promise<PageLines[]> {
-  const pdfjs = await import('pdfjs-dist');
-  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const workerUrl = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const doc = await pdfjs.getDocument({ data }).promise;

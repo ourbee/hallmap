@@ -5,8 +5,8 @@ export async function ocrPdfPages(
   data: ArrayBuffer,
   onProgress?: (msg: string) => void,
 ): Promise<string[]> {
-  const pdfjs = await import('pdfjs-dist');
-  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const workerUrl = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const { default: Tesseract } = await import('tesseract.js');
@@ -27,4 +27,12 @@ export async function ocrPdfPages(
     texts.push(result.data.text);
   }
   return texts;
+}
+
+// OCR a plain image file (photo or scan of a top sheet).
+export async function ocrImage(file: Blob, onProgress?: (msg: string) => void): Promise<string> {
+  const { default: Tesseract } = await import('tesseract.js');
+  onProgress?.('Running OCR on image… (this can take a while)');
+  const result = await Tesseract.recognize(file as File, 'eng');
+  return result.data.text;
 }

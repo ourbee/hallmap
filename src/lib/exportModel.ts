@@ -1,4 +1,4 @@
-import type { AppState, Arrangement, BenchPlan, RollDisplay, Room, RoomPlan } from '../types';
+import type { AppState, Arrangement, BenchPlan, CopyType, ExportContent, RollDisplay, Room, RoomPlan } from '../types';
 import { buildBenchPlan } from './allocate';
 import { rollLines } from './rollFormat';
 
@@ -13,13 +13,23 @@ export interface SheetModel {
   centreAddress: string;
   examName: string;
   dateDay: string;
-  timeSlot: string;
+  timeSlot: string; // session + entered time, e.g. "MORNING, 10:00 A.M. – 12:00 Noon"
   session: string;
   roomNumber: string;
   subjectsSummary: string; // e.g. "MPLS (18); MSOC (4);"
   rollBlocks: RollBlock[];
   total: number;
   benchPlan: BenchPlan | null;
+  includeSeating: boolean;
+  // Invigilator copies carry the blank Present/Absent/Signature rows;
+  // notice copies (posted outside rooms for students) omit them.
+  showAttendance: boolean;
+}
+
+export interface SheetOptions {
+  display: RollDisplay;
+  copyType: CopyType;
+  content: ExportContent;
 }
 
 const MAX_LINE_CHARS = 48; // character budget per printed roll line — deliberately airy
@@ -37,37 +47,40 @@ export function buildSheetModel(
   arrangement: Arrangement,
   plan: RoomPlan,
   room: Room,
-  display: RollDisplay,
+  opts: SheetOptions,
 ): SheetModel {
   const day = dayOfDate(arrangement.date);
   const subjectsSummary = plan.groups.map((g) => `${g.subjectCode} (${g.rolls.length})`).join(';  ') + (plan.groups.length ? ';' : '');
   const rollBlocks: RollBlock[] = plan.groups.map((g) => ({
     subjectCode: g.subjectCode,
     count: g.rolls.length,
-    lines: rollLines(g.rolls, display, MAX_LINE_CHARS),
+    lines: rollLines(g.rolls, opts.display, MAX_LINE_CHARS),
   }));
   const total = plan.groups.reduce((n, g) => n + g.rolls.length, 0);
   const examName = state.exam.name + (state.exam.scheme ? ` (${state.exam.scheme})` : '');
+  const timeSlot = [arrangement.session, arrangement.timeSlot].filter(Boolean).join(', ');
 
   return {
     centreName: state.centre.name,
     centreAddress: state.centre.address,
     examName,
     dateDay: day ? `${arrangement.date} (${day})` : arrangement.date,
-    timeSlot: arrangement.timeSlot,
+    timeSlot,
     session: arrangement.session,
     roomNumber: room.number,
     subjectsSummary,
     rollBlocks,
     total,
-    benchPlan: buildBenchPlan(plan, room, arrangement.benchMode),
+    benchPlan: opts.content === 'seating' ? null : buildBenchPlan(plan, room, arrangement.benchMode),
+    includeSeating: opts.content !== 'bench',
+    showAttendance: opts.copyType === 'invigilator',
   };
 }
 
-export function buildAllSheetModels(state: AppState, arrangement: Arrangement, display: RollDisplay): SheetModel[] {
+export function buildAllSheetModels(state: AppState, arrangement: Arrangement, opts: SheetOptions): SheetModel[] {
   const roomById = new Map(state.rooms.map((r) => [r.id, r]));
   return arrangement.roomPlans
-    .filter((p) => p.groups.length > 0)
-    .map((p) => buildSheetModel(state, arrangement, p, roomById.get(p.roomId)!, display))
-    .filter((m) => m.roomNumber !== undefined);
+    .filter((p) => p.groups.length > 0 && roomById.has(p.roomId))
+    .map((p) => buildSheetModel(state, arrangement, p, roomById.get(p.roomId)!, opts))
+    .filter((m) => m.includeSeating || m.benchPlan !== null);
 }

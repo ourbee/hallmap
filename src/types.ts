@@ -78,8 +78,20 @@ export interface Arrangement {
   generatedAt: number;
 }
 
+export type CopyType = 'invigilator' | 'notice';
+export type ExportContent = 'both' | 'seating' | 'bench';
+
 export interface ExportPrefs {
   rollDisplay: RollDisplay;
+  copyType: CopyType;
+  content: ExportContent;
+}
+
+export interface ImportPrefs {
+  // An example roll number typed by the user (e.g. "232035-11-0026").
+  // When set, a matching pattern is derived from it and used to recognise
+  // roll numbers that the built-in patterns miss.
+  rollExample: string;
 }
 
 export interface AppState {
@@ -90,6 +102,9 @@ export interface AppState {
   allotment: AllotmentRange[];
   arrangements: Arrangement[];
   exportPrefs: ExportPrefs;
+  importPrefs: ImportPrefs;
+  // Session last worked on in Arrange; Export follows it automatically.
+  activeSessionId: string;
 }
 
 export interface BenchSeat {
@@ -106,5 +121,7 @@ export const emptyState = (): AppState => ({
   topSheets: [],
   allotment: [],
   arrangements: [],
-  exportPrefs: { rollDisplay: 'full' },
+  exportPrefs: { rollDisplay: 'full', copyType: 'invigilator', content: 'both' },
+  importPrefs: { rollExample: '' },
+  activeSessionId: '',
 });

@@ -1,24 +1,32 @@
 import { useMemo, useState } from 'react';
 import { saveAs } from 'file-saver';
 import { useStore } from '../../state/store';
-import type { RollDisplay } from '../../types';
+import type { CopyType, ExportContent, RollDisplay } from '../../types';
 import { buildAllSheetModels } from '../../lib/exportModel';
-import type { SheetModel } from '../../lib/exportModel';
+import type { SheetModel, SheetOptions } from '../../lib/exportModel';
 
 export function ExportStep() {
   const { state, update } = useStore();
-  const [selectedId, setSelectedId] = useState<string>(state.arrangements[0]?.id ?? '');
   const [busy, setBusy] = useState('');
-  const arrangement = state.arrangements.find((a) => a.id === selectedId) ?? state.arrangements[0];
-  const display = state.exportPrefs.rollDisplay;
+
+  // Follows the session last worked on in Arrange automatically.
+  const arrangement =
+    state.arrangements.find((a) => a.id === state.activeSessionId) ?? state.arrangements[0];
+
+  const opts: SheetOptions = {
+    display: state.exportPrefs.rollDisplay,
+    copyType: state.exportPrefs.copyType,
+    content: state.exportPrefs.content,
+  };
 
   const models = useMemo(
-    () => (arrangement ? buildAllSheetModels(state, arrangement, display) : []),
-    [state, arrangement, display],
+    () => (arrangement ? buildAllSheetModels(state, arrangement, opts) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, arrangement, opts.display, opts.copyType, opts.content],
   );
 
   const [previewIndex, setPreviewIndex] = useState(0);
-  const preview = models[Math.min(previewIndex, models.length - 1)];
+  const preview = models[Math.min(previewIndex, Math.max(models.length - 1, 0))];
 
   if (state.arrangements.length === 0) {
     return (
@@ -29,7 +37,13 @@ export function ExportStep() {
     );
   }
 
-  const fileBase = arrangement ? `seating-${arrangement.date.replace(/\//g, '-')}-${arrangement.session.toLowerCase()}` : 'seating';
+  const setPrefs = (patch: Partial<typeof state.exportPrefs>) =>
+    update({ exportPrefs: { ...state.exportPrefs, ...patch } });
+
+  const contentSuffix = opts.content === 'both' ? '' : opts.content === 'seating' ? '-seating' : '-bench-plans';
+  const fileBase = arrangement
+    ? `seating-${arrangement.date.replace(/\//g, '-')}-${arrangement.session.toLowerCase()}-${opts.copyType}${contentSuffix}`
+    : 'seating';
 
   const exportPdf = async () => {
     setBusy('Building PDF…');
@@ -62,30 +76,91 @@ export function ExportStep() {
     setBusy('');
   };
 
+  const hasBenchData = arrangement
+    ? arrangement.roomPlans.some((p) => {
+        const room = state.rooms.find((r) => r.id === p.roomId);
+        return room?.bench && p.groups.length > 0;
+      })
+    : false;
+
   return (
     <>
       <div className="card">
         <h2>Export</h2>
         <p className="hint">
-          Word output is fully editable; the PDF is print-ready. Rooms with bench details get an extra Bench Plan
-          page after their seating sheet.
+          Word output is fully editable; the PDF is print-ready. The <strong>invigilator copy</strong> carries the
+          blank Total Present / Total Absent / Signature rows for use inside the exam room; the{' '}
+          <strong>notice copy</strong> omits them, for posting outside the centre and outside each room.
         </p>
-        <div className="btn-row" style={{ marginBottom: 14 }}>
-          <select value={arrangement?.id ?? ''} onChange={(e) => { setSelectedId(e.target.value); setPreviewIndex(0); }} style={{ maxWidth: 320 }}>
-            {state.arrangements.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.date} — {a.session}
-              </option>
+
+        <div className="btn-row" style={{ marginBottom: 10 }}>
+          <span className="badge blue">
+            Session: {arrangement.date} — {arrangement.session}
+          </span>
+          {state.arrangements.length > 1 && (
+            <select
+              value={arrangement.id}
+              onChange={(e) => {
+                update({ activeSessionId: e.target.value });
+                setPreviewIndex(0);
+              }}
+              style={{ maxWidth: 300 }}
+            >
+              {state.arrangements.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.date} — {a.session}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div className="btn-row" style={{ marginBottom: 10 }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Copy for:</span>
+          <div className="radio-group">
+            {(['invigilator', 'notice'] as CopyType[]).map((c) => (
+              <button
+                key={c}
+                className={opts.copyType === c ? 'on' : ''}
+                onClick={() => setPrefs({ copyType: c })}
+                title={
+                  c === 'invigilator'
+                    ? 'With blank Present / Absent / Signature rows — goes into each exam room'
+                    : 'Without those rows — posted outside the centre and each room for students'
+                }
+              >
+                {c === 'invigilator' ? 'Invigilators (with attendance)' : 'Notice board (students)'}
+              </button>
             ))}
-          </select>
+          </div>
+        </div>
+
+        <div className="btn-row" style={{ marginBottom: 10 }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Include:</span>
+          <div className="radio-group">
+            {(['both', 'seating', 'bench'] as ExportContent[]).map((c) => (
+              <button
+                key={c}
+                className={opts.content === c ? 'on' : ''}
+                onClick={() => setPrefs({ content: c })}
+                disabled={c !== 'seating' && !hasBenchData}
+                title={c !== 'seating' && !hasBenchData ? 'No room in this arrangement has bench data' : undefined}
+              >
+                {c === 'both' ? 'Seating + bench plans' : c === 'seating' ? 'Seating only' : 'Bench plans only'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="btn-row" style={{ marginBottom: 14 }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Roll numbers:</span>
           <div className="radio-group">
             {(['full', 'grouped'] as RollDisplay[]).map((d) => (
               <button
                 key={d}
-                className={display === d ? 'on' : ''}
-                onClick={() => update({ exportPrefs: { rollDisplay: d } })}
-                title={d === 'full' ? 'Print every roll number in full' : 'Group by roll-code prefix and print short serials'}
+                className={opts.display === d ? 'on' : ''}
+                onClick={() => setPrefs({ rollDisplay: d })}
+                title={d === 'full' ? 'Print every roll number in full' : 'Roll-code prefix on one line, short serials below'}
               >
                 {d === 'full' ? 'Full numbers' : 'Grouped by prefix'}
               </button>
@@ -132,66 +207,81 @@ export function ExportStep() {
 function SheetPreview({ model: m }: { model: SheetModel }) {
   return (
     <div className="sheet-preview">
-      <div className="c" style={{ fontWeight: 700, fontSize: '1.2rem' }}>{m.centreName || 'Examination Centre'}</div>
-      <div className="c">{m.centreAddress}</div>
-      <div className="c" style={{ fontWeight: 700 }}>{m.examName}</div>
-      <div className="c" style={{ fontWeight: 700, textDecoration: 'underline', marginTop: 4 }}>SEATING ARRANGEMENT</div>
-      <table>
-        <tbody>
-          <tr>
-            <td className="lbl">Date &amp; Day</td>
-            <td>{m.dateDay}</td>
-          </tr>
-          <tr>
-            <td className="lbl">Time</td>
-            <td>{m.timeSlot || m.session}</td>
-          </tr>
-          <tr>
-            <td className="lbl">Room No.</td>
-            <td style={{ fontWeight: 700 }}>{m.roomNumber}</td>
-          </tr>
-          <tr>
-            <td className="lbl">Subject(s) &amp; Code(s)</td>
-            <td style={{ fontWeight: 700 }}>{m.subjectsSummary}</td>
-          </tr>
-          <tr>
-            <td className="lbl">Roll Numbers (subject-wise)</td>
-            <td>
-              {m.rollBlocks.map((b, i) => (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <div style={{ fontWeight: 700 }}>
-                    {b.subjectCode} ({b.count})
-                  </div>
-                  {b.lines.map((l, j) => (
-                    <div key={j} className="roll-line">
-                      {l}
+      {m.includeSeating && (
+        <>
+          <div className="c" style={{ fontWeight: 700, fontSize: '1.2rem' }}>{m.centreName || 'Examination Centre'}</div>
+          <div className="c">{m.centreAddress}</div>
+          <div className="c" style={{ fontWeight: 700 }}>{m.examName}</div>
+          <div className="c" style={{ fontWeight: 700, textDecoration: 'underline', marginTop: 4 }}>SEATING ARRANGEMENT</div>
+          <table>
+            <tbody>
+              <tr>
+                <td className="lbl">Date &amp; Day</td>
+                <td>{m.dateDay}</td>
+              </tr>
+              <tr>
+                <td className="lbl">Time</td>
+                <td>{m.timeSlot || m.session}</td>
+              </tr>
+              <tr>
+                <td className="lbl">Room No.</td>
+                <td style={{ fontWeight: 700 }}>{m.roomNumber}</td>
+              </tr>
+              <tr>
+                <td className="lbl">Subject(s) &amp; Code(s)</td>
+                <td style={{ fontWeight: 700 }}>{m.subjectsSummary}</td>
+              </tr>
+              <tr>
+                <td className="lbl">Roll Numbers (subject-wise)</td>
+                <td>
+                  {m.rollBlocks.map((b, i) => (
+                    <div key={i} style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700 }}>
+                        {b.subjectCode} ({b.count})
+                      </div>
+                      {b.lines.map((l, j) => (
+                        <div key={j} className="roll-line">
+                          {l}
+                        </div>
+                      ))}
                     </div>
                   ))}
-                </div>
-              ))}
-            </td>
-          </tr>
-          <tr>
-            <td className="lbl">Total Number of Students</td>
-            <td style={{ fontWeight: 700 }}>{m.total}</td>
-          </tr>
-          <tr>
-            <td className="lbl">Total Present</td>
-            <td style={{ height: 34 }} />
-          </tr>
-          <tr>
-            <td className="lbl">Total Absent (with roll numbers of absent candidates)</td>
-            <td style={{ height: 56 }} />
-          </tr>
-          <tr>
-            <td className="lbl">Signature of Invigilators</td>
-            <td style={{ height: 56 }} />
-          </tr>
-        </tbody>
-      </table>
+                </td>
+              </tr>
+              <tr>
+                <td className="lbl">Total Number of Students</td>
+                <td style={{ fontWeight: 700 }}>{m.total}</td>
+              </tr>
+              {m.showAttendance && (
+                <>
+                  <tr>
+                    <td className="lbl">Total Present</td>
+                    <td style={{ height: 34 }} />
+                  </tr>
+                  <tr>
+                    <td className="lbl">Total Absent (with roll numbers of absent candidates)</td>
+                    <td style={{ height: 56 }} />
+                  </tr>
+                  <tr>
+                    <td className="lbl">Signature of Invigilators</td>
+                    <td style={{ height: 56 }} />
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </>
+      )}
       {m.benchPlan && (
         <>
-          <div style={{ fontWeight: 700, marginTop: 18 }}>Bench Plan — Room {m.roomNumber}</div>
+          <div style={{ fontWeight: 700, marginTop: m.includeSeating ? 18 : 0 }} className={m.includeSeating ? '' : 'c'}>
+            Bench Plan — Room {m.roomNumber}
+          </div>
+          {!m.includeSeating && (
+            <div className="c" style={{ marginBottom: 6 }}>
+              {m.dateDay} &nbsp;•&nbsp; {m.timeSlot || m.session}
+            </div>
+          )}
           <table>
             <tbody>
               {m.benchPlan.map((bench, i) =>

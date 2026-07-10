@@ -20,7 +20,7 @@ export function SetupStep() {
           <input
             type="text"
             value={state.centre.name}
-            placeholder="e.g. RANI BIRLA GIRLS' COLLEGE"
+            placeholder="Name of your examination centre"
             onChange={(e) => setCentre({ name: e.target.value })}
           />
         </div>
@@ -29,16 +29,16 @@ export function SetupStep() {
           <input
             type="text"
             value={state.centre.code}
-            placeholder="e.g. 033"
+            placeholder="Code assigned by the exam authority"
             onChange={(e) => setCentre({ code: e.target.value })}
           />
         </div>
         <div className="field">
-          <label>Address</label>
+          <label>Address (optional)</label>
           <input
             type="text"
             value={state.centre.address}
-            placeholder="e.g. 38, Shakespeare Sarani, Kolkata - 700 017"
+            placeholder="Printed under the centre name on each sheet"
             onChange={(e) => setCentre({ address: e.target.value })}
           />
         </div>
@@ -76,8 +76,8 @@ export function SetupStep() {
           />
         </div>
         <div className="field">
-          <label>Year</label>
-          <input type="text" value={state.exam.year} placeholder="e.g. 2024" onChange={(e) => setExam({ year: e.target.value })} />
+          <label>Year (optional)</label>
+          <input type="text" value={state.exam.year} placeholder="e.g. 2026" onChange={(e) => setExam({ year: e.target.value })} />
         </div>
       </div>
     </div>

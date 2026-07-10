@@ -87,39 +87,45 @@ function centred(doc: jsPDF, y: number, text: string, size: number, bold = false
 }
 
 function renderSheet(doc: jsPDF, m: SheetModel): void {
-  let y = MARGIN + 4;
-  y = centred(doc, y, m.centreName || 'Examination Centre', 15, true);
-  if (m.centreAddress) y = centred(doc, y, m.centreAddress, 10);
-  y = centred(doc, y, m.examName, 11, true);
-  y = centred(doc, y, 'SEATING ARRANGEMENT', 11, true);
-  doc.setLineWidth(0.4);
-  doc.line(PAGE_W / 2 - 24, y - 3.5, PAGE_W / 2 + 24, y - 3.5);
-  y += 2;
+  if (m.includeSeating) {
+    let y = MARGIN + 4;
+    y = centred(doc, y, m.centreName || 'Examination Centre', 15, true);
+    if (m.centreAddress) y = centred(doc, y, m.centreAddress, 10);
+    y = centred(doc, y, m.examName, 11, true);
+    y = centred(doc, y, 'SEATING ARRANGEMENT', 11, true);
+    doc.setLineWidth(0.4);
+    doc.line(PAGE_W / 2 - 24, y - 3.5, PAGE_W / 2 + 24, y - 3.5);
+    y += 2;
 
-  const rollLines: Line[] = [];
-  for (const block of m.rollBlocks) {
-    rollLines.push({ text: `${block.subjectCode} (${block.count})`, bold: true, size: 10.5 });
-    for (const l of block.lines) rollLines.push({ text: l, mono: true, bold: true, size: 10.5 });
-  }
+    const rollLines: Line[] = [];
+    for (const block of m.rollBlocks) {
+      rollLines.push({ text: `${block.subjectCode} (${block.count})`, bold: true, size: 10.5 });
+      for (const l of block.lines) rollLines.push({ text: l, mono: true, bold: true, size: 10.5 });
+    }
 
-  const rows: Row[] = [
-    { label: 'Date & Day', lines: [{ text: m.dateDay }] },
-    { label: 'Time', lines: [{ text: m.timeSlot || m.session }] },
-    { label: 'Room No.', lines: [{ text: m.roomNumber, bold: true, size: 12 }] },
-    { label: 'Subject(s) & Code(s)', lines: [{ text: m.subjectsSummary, bold: true }] },
-    { label: 'Roll Numbers (subject-wise)', lines: rollLines },
-    { label: 'Total Number of Students', lines: [{ text: String(m.total), bold: true, size: 12 }] },
-    { label: 'Total Present', lines: [], minHeight: 14 },
-    { label: 'Total Absent (with roll numbers of absent candidates)', lines: [], minHeight: 24 },
-    { label: 'Signature of Invigilators', lines: [], minHeight: 24 },
-  ];
+    const rows: Row[] = [
+      { label: 'Date & Day', lines: [{ text: m.dateDay }] },
+      { label: 'Time', lines: [{ text: m.timeSlot || m.session }] },
+      { label: 'Room No.', lines: [{ text: m.roomNumber, bold: true, size: 12 }] },
+      { label: 'Subject(s) & Code(s)', lines: [{ text: m.subjectsSummary, bold: true }] },
+      { label: 'Roll Numbers (subject-wise)', lines: rollLines },
+      { label: 'Total Number of Students', lines: [{ text: String(m.total), bold: true, size: 12 }] },
+    ];
+    if (m.showAttendance) {
+      rows.push(
+        { label: 'Total Present', lines: [], minHeight: 14 },
+        { label: 'Total Absent (with roll numbers of absent candidates)', lines: [], minHeight: 24 },
+        { label: 'Signature of Invigilators', lines: [], minHeight: 24 },
+      );
+    }
 
-  for (const row of rows) {
-    y = placeRow(doc, y, row);
+    for (const row of rows) {
+      y = placeRow(doc, y, row);
+    }
   }
 
   if (m.benchPlan) {
-    doc.addPage();
+    if (m.includeSeating) doc.addPage();
     let by = MARGIN + 4;
     by = centred(doc, by, `Bench Plan — Room ${m.roomNumber}`, 14, true);
     by = centred(doc, by, `${m.dateDay}   •   ${m.timeSlot || m.session}`, 10);

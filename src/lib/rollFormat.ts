@@ -55,8 +55,9 @@ export function rollLines(rolls: string[], display: RollDisplay, maxChars: numbe
   }
   const lines: string[] = [];
   for (const group of groupByPrefix(rolls)) {
-    const label = group.prefix ? `${group.prefix} — ` : '';
-    lines.push(...packLines(group.serials, maxChars, label));
+    // Prefix stands alone on its own line; the serials flow underneath it.
+    if (group.prefix) lines.push(`${group.prefix} —`);
+    lines.push(...packLines(group.serials, maxChars));
   }
   return lines;
 }

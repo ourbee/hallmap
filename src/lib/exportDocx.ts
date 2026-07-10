@@ -91,6 +91,22 @@ function sheetChildren(m: SheetModel): (Paragraph | Table)[] {
     for (const line of block.lines) rollParagraphs.push(rollPara(line));
   }
 
+  const tableRows = [
+    simpleRow('Date & Day', m.dateDay),
+    simpleRow('Time', m.timeSlot || m.session),
+    simpleRow('Room No.', m.roomNumber),
+    simpleRow('Subject(s) & Code(s)', m.subjectsSummary),
+    new TableRow({ children: [labelCell('Roll Numbers (subject-wise)'), valueCell(rollParagraphs)] }),
+    simpleRow('Total Number of Students', String(m.total)),
+  ];
+  if (m.showAttendance) {
+    tableRows.push(
+      blankRow('Total Present'),
+      blankRow('Total Absent (with roll numbers of absent candidates)', 900),
+      blankRow('Signature of Invigilators', 900),
+    );
+  }
+
   const table = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     borders: {
@@ -101,20 +117,10 @@ function sheetChildren(m: SheetModel): (Paragraph | Table)[] {
       insideHorizontal: { style: BorderStyle.SINGLE, size: 6 },
       insideVertical: { style: BorderStyle.SINGLE, size: 6 },
     },
-    rows: [
-      simpleRow('Date & Day', m.dateDay),
-      simpleRow('Time', m.timeSlot || m.session),
-      simpleRow('Room No.', m.roomNumber),
-      simpleRow('Subject(s) & Code(s)', m.subjectsSummary),
-      new TableRow({ children: [labelCell('Roll Numbers (subject-wise)'), valueCell(rollParagraphs)] }),
-      simpleRow('Total Number of Students', String(m.total)),
-      blankRow('Total Present'),
-      blankRow('Total Absent (with roll numbers of absent candidates)', 900),
-      blankRow('Signature of Invigilators', 900),
-    ],
+    rows: tableRows,
   });
 
-  const children: (Paragraph | Table)[] = [...heading, table];
+  const children: (Paragraph | Table)[] = m.includeSeating ? [...heading, table] : [];
 
   if (m.benchPlan) {
     children.push(
@@ -122,7 +128,7 @@ function sheetChildren(m: SheetModel): (Paragraph | Table)[] {
         spacing: { before: 300, after: 120 },
         children: [new TextRun({ text: `Bench Plan — Room ${m.roomNumber}`, bold: true, font: FONT, size: 26 })],
         heading: HeadingLevel.HEADING_2,
-        pageBreakBefore: true,
+        pageBreakBefore: m.includeSeating,
       }),
       new Paragraph({
         spacing: { after: 160 },

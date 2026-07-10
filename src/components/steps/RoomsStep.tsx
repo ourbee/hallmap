@@ -1,13 +1,13 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { saveAs } from 'file-saver';
 import { useStore } from '../../state/store';
 import type { Room } from '../../types';
 import { makeId } from '../../lib/id';
 import { parseRoomsCsv, roomsTemplateCsv, roomsToCsv } from '../../lib/roomsCsv';
+import { FileDrop } from '../FileDrop';
 
 export function RoomsStep() {
   const { state, update } = useStore();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [replaceOnUpload, setReplaceOnUpload] = useState(true);
   const [uploadMsg, setUploadMsg] = useState<string[]>([]);
 
@@ -86,24 +86,16 @@ export function RoomsStep() {
         >
           ⬇ Export current rooms
         </button>
-        <button className="btn" onClick={() => fileRef.current?.click()}>
-          ⬆ Upload filled CSV
-        </button>
         <label className="checkbox-line">
           <input type="checkbox" checked={replaceOnUpload} onChange={(e) => setReplaceOnUpload(e.target.checked)} />
           Replace existing rooms on upload
         </label>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".csv,text/csv"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void onUpload(f);
-            e.target.value = '';
-          }}
-        />
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FileDrop accept=".csv,text/csv" onFiles={(files) => void onUpload(files[0])}>
+          <strong>Drop the filled CSV here</strong> or click to browse
+        </FileDrop>
       </div>
 
       {uploadMsg.map((m, i) => (

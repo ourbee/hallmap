@@ -18,7 +18,13 @@ function load(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<AppState>;
-    return { ...emptyState(), ...parsed };
+    const empty = emptyState();
+    return {
+      ...empty,
+      ...parsed,
+      exportPrefs: { ...empty.exportPrefs, ...parsed.exportPrefs },
+      importPrefs: { ...empty.importPrefs, ...parsed.importPrefs },
+    };
   } catch {
     return emptyState();
   }

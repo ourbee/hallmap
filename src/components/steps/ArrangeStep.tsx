@@ -25,13 +25,19 @@ export function ArrangeStep() {
     return [...map.values()].sort((a, b) => a.id.localeCompare(b.id));
   }, [state.topSheets]);
 
-  const [selectedId, setSelectedId] = useState<string>(sessions[0]?.id ?? '');
+  const [selectedId, setSelectedId] = useState<string>(state.activeSessionId || (sessions[0]?.id ?? ''));
   const selected = sessions.find((s) => s.id === selectedId) ?? sessions[0];
+
+  const selectSession = (id: string) => {
+    setSelectedId(id);
+    update({ activeSessionId: id });
+  };
   const arrangement = state.arrangements.find((a) => a.id === selected?.id);
 
   const saveArrangement = (a: Arrangement) =>
     update({
       arrangements: [...state.arrangements.filter((x) => x.id !== a.id), a],
+      activeSessionId: a.id,
     });
 
   const generate = () => {
@@ -76,7 +82,7 @@ export function ArrangeStep() {
           Sessions are grouped automatically from the imported top sheets (one arrangement per date + session).
         </p>
         <div className="btn-row" style={{ marginBottom: 12 }}>
-          <select value={selected?.id ?? ''} onChange={(e) => setSelectedId(e.target.value)} style={{ maxWidth: 340 }}>
+          <select value={selected?.id ?? ''} onChange={(e) => selectSession(e.target.value)} style={{ maxWidth: 340 }}>
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.date || 'undated'} — {s.session || 'no session'} ({s.sheets.length} subject{s.sheets.length === 1 ? '' : 's'})

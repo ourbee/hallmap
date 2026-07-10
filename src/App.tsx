@@ -72,6 +72,11 @@ function Shell() {
       <p className="footer-note">
         Everything runs locally in your browser — no data is uploaded anywhere. Work is saved automatically on this
         device.
+        <br />
+        Created by{' '}
+        <a href="https://github.com/ourbee" target="_blank" rel="noopener noreferrer">
+          Ritwik Balo
+        </a>
       </p>
     </>
   );

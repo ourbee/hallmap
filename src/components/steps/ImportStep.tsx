@@ -1,37 +1,60 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../../state/store';
 import type { TopSheet } from '../../types';
 import { makeId } from '../../lib/id';
 import { extractPdfPages } from '../../lib/pdfText';
+import type { PageLines } from '../../lib/pdfText';
 import { parseTopSheetPages, parsePastedRolls } from '../../lib/parseTopSheet';
 import { parseAllotment } from '../../lib/parseAllotment';
+import { dayOfDate } from '../../lib/exportModel';
+import { FileDrop } from '../FileDrop';
+
+function textToPages(texts: string[]): PageLines[] {
+  return texts.map((t) => {
+    const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return { lines, raw: lines.join('\n') };
+  });
+}
 
 export function ImportStep() {
   const { state, update } = useStore();
-  const topRef = useRef<HTMLInputElement>(null);
-  const allotRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const [ocrCandidate, setOcrCandidate] = useState<File | null>(null);
+
+  const rollExample = state.importPrefs.rollExample;
 
   const setSheet = (id: string, patch: Partial<TopSheet>) =>
     update({ topSheets: state.topSheets.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
   const removeSheet = (id: string) => update({ topSheets: state.topSheets.filter((s) => s.id !== id) });
 
-  const importTopSheets = async (files: FileList) => {
+  const importTopSheets = async (files: File[]) => {
     setNotice(null);
     setOcrCandidate(null);
     const added: TopSheet[] = [];
-    let emptyFile: File | null = null;
-    for (const file of Array.from(files)) {
-      setBusy(`Reading ${file.name}…`);
+    let needsOcr: File | null = null;
+    const errors: string[] = [];
+
+    for (const file of files) {
+      const isImage = /^image\//.test(file.type) || /\.(png|jpe?g|webp|heic|bmp|tiff?)$/i.test(file.name);
       try {
-        const pages = await extractPdfPages(await file.arrayBuffer());
-        const sheets = parseTopSheetPages(pages, file.name);
-        if (sheets.length === 0) emptyFile = file;
-        added.push(...sheets);
+        if (isImage) {
+          // Images can't carry a text layer — go straight to OCR.
+          const { ocrImage } = await import('../../lib/ocr');
+          setBusy(`Running OCR on ${file.name}…`);
+          const text = await ocrImage(file, setBusy);
+          const sheets = parseTopSheetPages(textToPages([text]), `${file.name} (OCR)`, rollExample);
+          if (sheets.length === 0) errors.push(`${file.name}: OCR found no roll numbers. Add the sheet manually and paste them in.`);
+          added.push(...sheets);
+        } else {
+          setBusy(`Reading ${file.name}…`);
+          const pages = await extractPdfPages(await file.arrayBuffer());
+          const sheets = parseTopSheetPages(pages, file.name, rollExample);
+          if (sheets.length === 0) needsOcr = file;
+          added.push(...sheets);
+        }
       } catch (err) {
-        setNotice({ kind: 'error', text: `Could not read ${file.name}: ${err instanceof Error ? err.message : String(err)}` });
+        errors.push(`Could not read ${file.name}: ${err instanceof Error ? err.message : String(err)}. If it is a scanned or unusual file, try the manual entry option.`);
       }
     }
     setBusy('');
@@ -42,11 +65,13 @@ export function ImportStep() {
         text: `Extracted ${added.length} top sheet(s), ${added.reduce((n, s) => n + s.rolls.length, 0)} roll numbers. Review below and correct anything the parser got wrong.`,
       });
     }
-    if (emptyFile) {
-      setOcrCandidate(emptyFile);
+    if (errors.length > 0) {
+      setNotice({ kind: 'error', text: errors.join(' ') });
+    } else if (needsOcr) {
+      setOcrCandidate(needsOcr);
       setNotice({
         kind: 'warn',
-        text: `${emptyFile.name}: no roll numbers found in the text layer — it may be a scanned copy. Try OCR below, or add a sheet manually.`,
+        text: `${needsOcr.name}: no roll numbers found in the text layer — it may be a scanned copy. Try OCR below, or add a sheet manually.`,
       });
     }
   };
@@ -55,11 +80,7 @@ export function ImportStep() {
     try {
       const { ocrPdfPages } = await import('../../lib/ocr');
       const texts = await ocrPdfPages(await file.arrayBuffer(), setBusy);
-      const pages = texts.map((t) => {
-        const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-        return { lines, raw: lines.join('\n') };
-      });
-      const sheets = parseTopSheetPages(pages, `${file.name} (OCR)`);
+      const sheets = parseTopSheetPages(textToPages(texts), `${file.name} (OCR)`, rollExample);
       setBusy('');
       if (sheets.length > 0) {
         update({ topSheets: [...state.topSheets, ...sheets] });
@@ -130,14 +151,21 @@ export function ImportStep() {
       <div className="card">
         <h2>Top Sheets</h2>
         <p className="hint">
-          Upload the top-sheet PDFs for the papers being held on an exam day. One PDF may contain several subject
-          sheets — each is detected separately, and duplicate copies are ignored. Everything extracted is editable
-          below before you build the arrangement.
+          Upload the top sheets for the papers being held on an exam day — PDFs, or photos/scans (which are read with
+          OCR). One PDF may contain several subject sheets; each is detected separately, and duplicate copies are
+          ignored. Everything extracted is editable below before you build the arrangement.
         </p>
-        <div className="btn-row">
-          <button className="btn primary" onClick={() => topRef.current?.click()}>
-            ⬆ Upload top sheet PDF(s)
-          </button>
+
+        <FileDrop
+          accept=".pdf,application/pdf,image/*"
+          multiple
+          onFiles={(files) => void importTopSheets(files)}
+        >
+          <strong>Drop top sheets here</strong> or click to browse
+          <div style={{ fontSize: '0.8rem', marginTop: 4 }}>PDF, JPG, PNG…</div>
+        </FileDrop>
+
+        <div className="btn-row" style={{ marginTop: 12 }}>
           <button className="btn" onClick={addManualSheet}>
             + Add a sheet manually
           </button>
@@ -146,23 +174,32 @@ export function ImportStep() {
               🔍 Run OCR on {ocrCandidate.name}
             </button>
           )}
+          <div className="field" style={{ marginBottom: 0, maxWidth: 280 }}>
+            <input
+              type="text"
+              value={rollExample}
+              placeholder="Roll number example (optional)"
+              title="If roll numbers are not detected automatically, paste one example roll number here (e.g. 232035-11-0026). Files parsed afterwards will use its pattern."
+              onChange={(e) => update({ importPrefs: { rollExample: e.target.value } })}
+            />
+          </div>
         </div>
-        <input
-          ref={topRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          multiple
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            if (e.target.files?.length) void importTopSheets(e.target.files);
-            e.target.value = '';
-          }}
-        />
+        <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
+          If roll numbers aren't being picked up, type one example roll number (e.g. 232035-11-0026) in the box above —
+          the app will learn its pattern and use it for the next upload or paste.
+        </p>
+
         {busy && <p className="progress-note" style={{ marginTop: 10 }}>{busy}</p>}
         {notice && <div className={`alert ${notice.kind === 'ok' ? 'ok' : notice.kind}`} style={{ marginTop: 10 }}>{notice.text}</div>}
 
         {state.topSheets.map((s) => (
-          <SheetEditor key={s.id} sheet={s} onChange={(p) => setSheet(s.id, p)} onRemove={() => removeSheet(s.id)} />
+          <SheetEditor
+            key={s.id}
+            sheet={s}
+            rollExample={rollExample}
+            onChange={(p) => setSheet(s.id, p)}
+            onRemove={() => removeSheet(s.id)}
+          />
         ))}
       </div>
 
@@ -174,30 +211,17 @@ export function ImportStep() {
           The centre-level allotment letter is used for reference and validation only: it fills in centre details and
           lets the app warn you when an imported roll number falls outside your centre's allotted ranges.
         </p>
-        <div className="btn-row">
-          <button className="btn" onClick={() => allotRef.current?.click()}>
-            ⬆ Upload allotment PDF
-          </button>
-          {state.allotment.length > 0 && (
-            <>
-              <span className="badge green">{state.allotment.length} ranges loaded</span>
-              <button className="btn small danger" onClick={() => update({ allotment: [] })}>
-                Clear
-              </button>
-            </>
-          )}
-        </div>
-        <input
-          ref={allotRef}
-          type="file"
-          accept=".pdf,application/pdf"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void importAllotment(f);
-            e.target.value = '';
-          }}
-        />
+        <FileDrop accept=".pdf,application/pdf" onFiles={(files) => void importAllotment(files[0])}>
+          <strong>Drop the allotment PDF here</strong> or click to browse
+        </FileDrop>
+        {state.allotment.length > 0 && (
+          <div className="btn-row" style={{ marginTop: 10 }}>
+            <span className="badge green">{state.allotment.length} ranges loaded</span>
+            <button className="btn small danger" onClick={() => update({ allotment: [] })}>
+              Clear
+            </button>
+          </div>
+        )}
         {state.allotment.length > 0 && (
           <table className="data" style={{ marginTop: 14 }}>
             <thead>
@@ -231,20 +255,34 @@ export function ImportStep() {
   );
 }
 
+// dd/mm/yyyy ↔ yyyy-mm-dd (native date input value)
+function toInputDate(ddmmyyyy: string): string {
+  const m = ddmmyyyy.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
+function fromInputDate(value: string): string {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
 function SheetEditor({
   sheet,
+  rollExample,
   onChange,
   onRemove,
 }: {
   sheet: TopSheet;
+  rollExample: string;
   onChange: (patch: Partial<TopSheet>) => void;
   onRemove: () => void;
 }) {
   const [rollText, setRollText] = useState<string | null>(null);
   const countMismatch = sheet.expectedCount !== null && sheet.expectedCount !== sheet.rolls.length;
+  const day = dayOfDate(sheet.date);
 
   const commitRolls = (text: string) => {
-    const rolls = parsePastedRolls(text);
+    const rolls = parsePastedRolls(text, rollExample);
     // If the pasted text has no recognisable pattern, fall back to whitespace tokens
     const tokens = rolls.length > 0 ? rolls : text.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean);
     onChange({ rolls: [...new Set(tokens)] });
@@ -288,8 +326,12 @@ function SheetEditor({
           </div>
           <div className="grid-2">
             <div className="field">
-              <label>Date (dd/mm/yyyy)</label>
-              <input type="text" value={sheet.date} placeholder="13/09/2024" onChange={(e) => onChange({ date: e.target.value })} />
+              <label>Date {day ? `(${day})` : ''}</label>
+              <input
+                type="date"
+                value={toInputDate(sheet.date)}
+                onChange={(e) => onChange({ date: fromInputDate(e.target.value) })}
+              />
             </div>
             <div className="field">
               <label>Session</label>

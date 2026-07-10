@@ -401,6 +401,12 @@ details.bench-details summary {
   font-size: 0.8rem;
   text-align: center;
   margin-top: 30px;
+  line-height: 1.9;
+}
+
+.footer-note a {
+  color: var(--primary-dark);
+  font-weight: 600;
 }
 
 .checkbox-line {

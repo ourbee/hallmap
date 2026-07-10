@@ -50,7 +50,7 @@ const arrangement: Arrangement = {
 };
 
 for (const display of ['full', 'grouped'] as const) {
-  const models = buildAllSheetModels(state, arrangement, display);
+  const models = buildAllSheetModels(state, arrangement, { display, copyType: 'invigilator', content: 'both' });
   const pdfBlob = buildPdf(models);
   writeFileSync(`${OUT}/test-${display}.pdf`, Buffer.from(await pdfBlob.arrayBuffer()));
   const docxBlob = await buildDocx(models);

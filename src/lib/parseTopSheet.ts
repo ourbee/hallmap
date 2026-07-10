@@ -11,7 +11,31 @@ const SESSION_RE = /\b(MORNING|AFTERNOON|EVENING|1ST HALF|2ND HALF)\b/i;
 // e.g. 033/MPLS2/M/1  → centre 033, subject MPLS
 const PACKET_RE = /\b(\d{2,4})\/([A-Z]+)\d*\/[A-Z]+\/\d+\b/;
 
-export function extractRolls(text: string): string[] {
+// Build a matching pattern from an example roll number the user typed.
+// Digit runs become \d{n}, letter runs [A-Za-z]{n}, everything else is
+// matched literally: "232035-11-0026" → /\d{6}-\d{2}-\d{4}/g
+export function patternFromExample(example: string): RegExp | null {
+  const trimmed = example.trim();
+  if (!trimmed) return null;
+  let src = '';
+  for (const run of trimmed.match(/\d+|[A-Za-z]+|./gs) ?? []) {
+    if (/^\d+$/.test(run)) src += `\\d{${run.length}}`;
+    else if (/^[A-Za-z]+$/.test(run)) src += `[A-Za-z]{${run.length}}`;
+    else src += run.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  try {
+    return new RegExp(`\\b${src}\\b`, 'g');
+  } catch {
+    return null;
+  }
+}
+
+export function extractRolls(text: string, rollExample = ''): string[] {
+  const custom = patternFromExample(rollExample);
+  if (custom) {
+    const found = [...text.matchAll(custom)].map((m) => m[0]);
+    if (found.length > 0) return dedupe(found);
+  }
   const hyphenated = [...text.matchAll(ROLL_HYPHEN)].map((m) => m[1]);
   if (hyphenated.length > 0) return dedupe(hyphenated);
   const dates = new Set([...text.matchAll(/\b\d{2}\/\d{2}\/\d{4}\b/g)].map((m) => m[0].replace(/\//g, '')));
@@ -50,9 +74,9 @@ function findExpectedCount(lines: string[], rolls: Set<string>): number | null {
 
 // Parse a single page of a top-sheet PDF into a TopSheet (or null if the page
 // clearly isn't a top sheet — e.g. no roll numbers at all).
-export function parseTopSheetPage(page: PageLines, sourceFile: string, pageNo: number): TopSheet | null {
+export function parseTopSheetPage(page: PageLines, sourceFile: string, pageNo: number, rollExample = ''): TopSheet | null {
   const { lines, raw } = page;
-  const rolls = extractRolls(raw);
+  const rolls = extractRolls(raw, rollExample);
   if (rolls.length === 0) return null;
 
   const packetMatch = raw.match(PACKET_RE);
@@ -106,11 +130,11 @@ export function parseTopSheetPage(page: PageLines, sourceFile: string, pageNo: n
 
 // Parse all pages of a PDF and de-duplicate repeated sheets (packets are often
 // printed twice in the same file).
-export function parseTopSheetPages(pages: PageLines[], sourceFile: string): TopSheet[] {
+export function parseTopSheetPages(pages: PageLines[], sourceFile: string, rollExample = ''): TopSheet[] {
   const sheets: TopSheet[] = [];
   const seen = new Set<string>();
   pages.forEach((page, i) => {
-    const sheet = parseTopSheetPage(page, sourceFile, i + 1);
+    const sheet = parseTopSheetPage(page, sourceFile, i + 1, rollExample);
     if (!sheet) return;
     const key = [sheet.subjectCode, sheet.packetNo, sheet.date, sheet.session, sheet.rolls.join(',')].join('|');
     if (seen.has(key)) return;
@@ -121,6 +145,6 @@ export function parseTopSheetPages(pages: PageLines[], sourceFile: string): TopS
 }
 
 // Parse manually pasted text (OCR output or hand-typed) into rolls.
-export function parsePastedRolls(text: string): string[] {
-  return extractRolls(text);
+export function parsePastedRolls(text: string, rollExample = ''): string[] {
+  return extractRolls(text, rollExample);
 }
