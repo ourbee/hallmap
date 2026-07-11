@@ -4,6 +4,8 @@ Exam seating arrangements, from top sheets to printable room sheets — built fo
 
 Everything runs **locally in the browser**: PDFs are parsed on your machine, work is saved to the browser's local storage, and no data is uploaded anywhere.
 
+Live at https://ourbee.github.io/hallmap/
+
 ## What it does
 
 1. **Setup** — enter (or auto-fill) the exam centre profile and examination details.
