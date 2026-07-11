@@ -67,7 +67,7 @@ export function RoomsStep() {
       <div className="stat-row">
         <div className="stat">
           <div className="v">{state.rooms.filter((r) => r.active).length}</div>
-          <div className="k">Active rooms</div>
+          <div className="k">Available rooms</div>
         </div>
         <div className="stat">
           <div className="v">{totalCapacity}</div>
@@ -118,8 +118,8 @@ export function RoomsStep() {
             <th>Capacity</th>
             <th>Building / Floor</th>
             <th>Benches (opt.)</th>
-            <th>Seats / bench (opt.)</th>
-            <th>Active</th>
+            <th>Seats per bench (opt.)</th>
+            <th>Available</th>
             <th />
           </tr>
         </thead>

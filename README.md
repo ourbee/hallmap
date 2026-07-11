@@ -1,4 +1,4 @@
-# Seating Studio
+# HallMap
 
 Exam seating arrangements, from top sheets to printable room sheets — built for exam-centre Officers-in-Charge.
 
@@ -9,7 +9,7 @@ Everything runs **locally in the browser**: PDFs are parsed on your machine, wor
 1. **Setup** — enter (or auto-fill) the exam centre profile and examination details.
 2. **Rooms** — enter each room's capacity; optionally add bench data (number of benches × seats per bench). A blank CSV template can be downloaded, filled and re-uploaded.
 3. **Import** — upload top-sheet PDFs. Each PDF may contain several subject sheets; each is detected separately, duplicate copies are ignored, and every extracted field is editable before use. A scanned PDF can be run through OCR as a fallback, or a sheet can be typed in manually. Optionally upload the centre allotment letter: it fills in centre details and validates roll numbers against the allotted ranges.
-4. **Arrange** — sessions are grouped automatically by date + session. One click allocates all students to rooms without exceeding capacity, keeping subjects together and splitting a subject across rooms when needed. Move subject blocks between rooms, lock rooms, and regenerate. Rooms with bench data get a bench-level plan with a choice of **keep subjects together** or **mix subjects per bench** (anti-copying interleave).
+4. **Arrange** — sessions are grouped automatically by date + session. One click allocates all students using as few rooms as possible, keeping each subject in a single room and splitting a subject across rooms only when capacity forces it (for ease of script collection). Merge hints show when a whole room can be shifted into another's free seats. Move subject blocks between rooms, lock rooms, and regenerate. Rooms with bench data get a bench-level plan with a choice of **keep subjects together** or **mix subjects per bench** (anti-copying interleave).
 5. **Export** — per-room seating sheets in editable **Word (.docx)** and print-ready **PDF**, combined or as one file per room (ZIP). Rooms with bench data get a Bench Plan annex page. Roll numbers print either in full or grouped by roll-code prefix with short serials.
 
 ## Validation built in

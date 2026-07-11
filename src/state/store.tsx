@@ -3,7 +3,9 @@ import type { ReactNode } from 'react';
 import type { AppState } from '../types';
 import { emptyState } from '../types';
 
-const STORAGE_KEY = 'seating-studio-v1';
+const STORAGE_KEY = 'hallmap-v1';
+// Data saved under the app's previous name (Seating Studio) is still loaded.
+const LEGACY_STORAGE_KEY = 'seating-studio-v1';
 
 interface Store {
   state: AppState;
@@ -15,7 +17,7 @@ const StoreContext = createContext<Store | null>(null);
 
 function load(): AppState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<AppState>;
     const empty = emptyState();

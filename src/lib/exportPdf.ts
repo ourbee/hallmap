@@ -1,13 +1,21 @@
 import { jsPDF } from 'jspdf';
 import type { SheetModel } from './exportModel';
+import { rollLines } from './rollFormat';
 
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 14;
 const LABEL_W = 52;
 const VALUE_W = PAGE_W - 2 * MARGIN - LABEL_W;
-const LINE_H = 7; // generous line height so numbers never look crowded
 const PAD = 3;
+
+// Base sizing — scaled down automatically when a room's roll list would not
+// fit on one A4 page (rooms with many candidates).
+const BASE_LINE_H = 7;
+const BASE_FONT = 10.5;
+const MONO_CHAR_SPACE = 0.25; // mm of extra tracking between roll digits
+// Try full size first; shrink in steps. 0.66 still prints clearly on A4.
+const FIT_SCALES = [1, 0.9, 0.8, 0.72, 0.66];
 
 interface Line {
   text: string;
@@ -19,17 +27,18 @@ interface Line {
 interface Row {
   label: string;
   lines: Line[];
+  lineH: number;
   minHeight?: number;
 }
 
 function setFont(doc: jsPDF, line: Line) {
   doc.setFont(line.mono ? 'courier' : 'helvetica', line.bold ? 'bold' : 'normal');
-  doc.setFontSize(line.size ?? 10.5);
+  doc.setFontSize(line.size ?? BASE_FONT);
 }
 
 function rowHeight(row: Row): number {
-  const contentH = row.lines.length * LINE_H + 2 * PAD;
-  return Math.max(row.minHeight ?? 0, contentH, LINE_H + 2 * PAD);
+  const contentH = row.lines.length * row.lineH + 2 * PAD;
+  return Math.max(row.minHeight ?? 0, contentH, row.lineH + 2 * PAD);
 }
 
 function drawRow(doc: jsPDF, y: number, row: Row, height: number): void {
@@ -46,8 +55,8 @@ function drawRow(doc: jsPDF, y: number, row: Row, height: number): void {
 
   row.lines.forEach((line, i) => {
     setFont(doc, line);
-    doc.text(line.text, x + LABEL_W + PAD, y + PAD + 4.5 + i * LINE_H, {
-      charSpace: line.mono ? 0.25 : 0,
+    doc.text(line.text, x + LABEL_W + PAD, y + PAD + 0.65 * row.lineH + i * row.lineH, {
+      charSpace: line.mono ? MONO_CHAR_SPACE : 0,
     });
   });
 }
@@ -58,10 +67,11 @@ function placeRow(doc: jsPDF, y: number, row: Row): number {
   let first = true;
   for (;;) {
     const available = PAGE_H - MARGIN - y;
-    const fitCount = Math.max(0, Math.floor((available - 2 * PAD) / LINE_H));
+    const fitCount = Math.max(0, Math.floor((available - 2 * PAD) / row.lineH));
+    const label = first ? row.label : `${row.label} (contd.)`;
     const need = rowHeight({ ...row, lines });
     if (need <= available) {
-      drawRow(doc, y, { ...row, label: first ? row.label : `${row.label} (contd.)` }, need);
+      drawRow(doc, y, { ...row, lines, label }, need);
       return y + need;
     }
     if (fitCount < 2) {
@@ -69,8 +79,7 @@ function placeRow(doc: jsPDF, y: number, row: Row): number {
       y = MARGIN;
       continue;
     }
-    const head = lines.slice(0, fitCount);
-    drawRow(doc, y, { label: first ? row.label : `${row.label} (contd.)`, lines: head }, available);
+    drawRow(doc, y, { ...row, lines: lines.slice(0, fitCount), label }, available);
     lines = lines.slice(fitCount);
     first = false;
     doc.addPage();
@@ -86,37 +95,61 @@ function centred(doc: jsPDF, y: number, text: string, size: number, bold = false
   return y + wrapped.length * (size * 0.5) + 2;
 }
 
+// How many characters of monospaced roll text fit in the value column at
+// a given scale (courier glyph width ≈ 0.6 × font size, plus tracking).
+function monoCharsPerLine(scale: number): number {
+  const charW = BASE_FONT * scale * 0.6 * 0.3528 + MONO_CHAR_SPACE;
+  return Math.floor((VALUE_W - 2 * PAD - 2) / charW);
+}
+
+// Table rows for the seating sheet at a given scale.
+function seatingRows(m: SheetModel, scale: number): Row[] {
+  const lineH = BASE_LINE_H * scale;
+  const size = BASE_FONT * scale;
+  const maxChars = monoCharsPerLine(scale);
+
+  const rolls: Line[] = [];
+  for (const block of m.rollBlocks) {
+    rolls.push({ text: `${block.subjectCode} (${block.count})`, bold: true, size });
+    for (const l of rollLines(block.rolls, m.rollDisplay, maxChars)) {
+      rolls.push({ text: l, mono: true, bold: true, size });
+    }
+  }
+
+  const rows: Row[] = [
+    { label: 'Date & Day', lineH, lines: [{ text: m.dateDay, size }] },
+    { label: 'Time', lineH, lines: [{ text: m.timeSlot || m.session, size }] },
+    { label: 'Room No.', lineH, lines: [{ text: m.roomNoDisplay, bold: true, size: Math.max(size, 11) }] },
+    { label: 'Subject(s) & Code(s)', lineH, lines: [{ text: m.subjectsSummary, bold: true, size }] },
+    { label: 'Roll Numbers (subject-wise)', lineH, lines: rolls },
+    { label: 'Total Number of Students', lineH, lines: [{ text: String(m.total), bold: true, size: Math.max(size, 11) }] },
+  ];
+  if (m.showAttendance) {
+    rows.push(
+      { label: 'Total Present', lineH, lines: [], minHeight: 14 },
+      { label: 'Total Absent (with roll numbers of absent candidates)', lineH, lines: [], minHeight: 24 },
+      { label: 'Signature of Invigilators', lineH, lines: [], minHeight: 24 },
+    );
+  }
+  return rows;
+}
+
 function renderSheet(doc: jsPDF, m: SheetModel): void {
   if (m.includeSeating) {
     let y = MARGIN + 4;
     y = centred(doc, y, m.centreName || 'Examination Centre', 15, true);
     if (m.centreAddress) y = centred(doc, y, m.centreAddress, 10);
     y = centred(doc, y, m.examName, 11, true);
-    y = centred(doc, y, 'SEATING ARRANGEMENT', 11, true);
-    doc.setLineWidth(0.4);
-    doc.line(PAGE_W / 2 - 24, y - 3.5, PAGE_W / 2 + 24, y - 3.5);
     y += 2;
 
-    const rollLines: Line[] = [];
-    for (const block of m.rollBlocks) {
-      rollLines.push({ text: `${block.subjectCode} (${block.count})`, bold: true, size: 10.5 });
-      for (const l of block.lines) rollLines.push({ text: l, mono: true, bold: true, size: 10.5 });
-    }
-
-    const rows: Row[] = [
-      { label: 'Date & Day', lines: [{ text: m.dateDay }] },
-      { label: 'Time', lines: [{ text: m.timeSlot || m.session }] },
-      { label: 'Room No.', lines: [{ text: m.roomNumber, bold: true, size: 12 }] },
-      { label: 'Subject(s) & Code(s)', lines: [{ text: m.subjectsSummary, bold: true }] },
-      { label: 'Roll Numbers (subject-wise)', lines: rollLines },
-      { label: 'Total Number of Students', lines: [{ text: String(m.total), bold: true, size: 12 }] },
-    ];
-    if (m.showAttendance) {
-      rows.push(
-        { label: 'Total Present', lines: [], minHeight: 14 },
-        { label: 'Total Absent (with roll numbers of absent candidates)', lines: [], minHeight: 24 },
-        { label: 'Signature of Invigilators', lines: [], minHeight: 24 },
-      );
+    // Pick the largest scale whose whole table fits on this page; if even the
+    // smallest overflows, keep the smallest and continue onto the next page.
+    const available = PAGE_H - MARGIN - y;
+    let rows = seatingRows(m, FIT_SCALES[0]);
+    for (const scale of FIT_SCALES) {
+      rows = seatingRows(m, scale);
+      const total = rows.reduce((h, r) => h + rowHeight(r), 0);
+      if (total <= available) break;
     }
 
     for (const row of rows) {
@@ -136,7 +169,7 @@ function renderSheet(doc: jsPDF, m: SheetModel): void {
         bench.length > 0
           ? bench.map((s) => ({ text: `${s.roll}   (${s.subjectCode})`, mono: true, bold: true }))
           : [{ text: '— empty —' }];
-      by = placeRow(doc, by, { label: `Bench ${i + 1}`, lines });
+      by = placeRow(doc, by, { label: `Bench ${i + 1}`, lineH: BASE_LINE_H, lines });
     }
   }
 }

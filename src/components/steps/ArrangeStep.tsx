@@ -158,8 +158,9 @@ export function ArrangeStep() {
         <div className="card">
           <h2>Room-wise Assignment</h2>
           <p className="hint">
-            Move a subject block to another room with the dropdown beside it. Lock a room to keep it unchanged when
-            regenerating.
+            The generator uses as few rooms as possible and keeps each subject in a single room, splitting a subject
+            only when a room's capacity forces it. Move a subject block to another room with the dropdown beside it.
+            Lock a room to keep it unchanged when regenerating.
           </p>
           {arrangement.roomPlans.map((plan) => (
             <RoomCard
@@ -200,6 +201,21 @@ function RoomCard({
   const benchPlan = buildBenchPlan(plan, room, arrangement.benchMode);
   const otherRooms = state.rooms.filter((r) => r.active && r.id !== room.id);
 
+  // Seats still free in every other room, from the current plans.
+  const seatedIn = new Map(
+    arrangement.roomPlans.map((p) => [p.roomId, p.groups.reduce((n, g) => n + g.rolls.length, 0)]),
+  );
+  const freeSeats = (r: { id: string; capacity: number }) => r.capacity - (seatedIn.get(r.id) ?? 0);
+
+  // Whole-room merge suggestion: another occupied room that can absorb everyone
+  // seated here (tightest fit preferred) — using it frees this room entirely.
+  const mergeTarget =
+    seatedHere > 0 && !plan.locked
+      ? otherRooms
+          .filter((r) => (seatedIn.get(r.id) ?? 0) > 0 && freeSeats(r) >= seatedHere)
+          .sort((a, b) => freeSeats(a) - freeSeats(b))[0]
+      : undefined;
+
   return (
     <div className={`room-card ${over ? 'over' : ''}`}>
       <div className="room-head">
@@ -207,6 +223,12 @@ function RoomCard({
         <span className={`badge ${over ? 'red' : seatedHere > 0 ? 'green' : 'blue'}`}>
           {seatedHere} / {room.capacity}
         </span>
+        {mergeTarget && (
+          <span className="badge amber" title="Move each subject block there with its Move to… dropdown to free this room.">
+            💡 All {seatedHere} student{seatedHere === 1 ? '' : 's'} in this room can be shifted to Room{' '}
+            {mergeTarget.number} ({freeSeats(mergeTarget)} seats free)
+          </span>
+        )}
         {room.bench && (
           <span className="badge blue">
             {room.bench.benchCount} benches × {room.bench.seatsPerBench}
@@ -237,7 +259,7 @@ function RoomCard({
               <option value="">Move to…</option>
               {otherRooms.map((r) => (
                 <option key={r.id} value={r.id}>
-                  Room {r.number}
+                  Room {r.number} — {freeSeats(r) > 0 ? `${freeSeats(r)} seat${freeSeats(r) === 1 ? '' : 's'} available` : 'full'}
                 </option>
               ))}
             </select>

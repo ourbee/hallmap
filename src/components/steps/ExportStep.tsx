@@ -169,11 +169,11 @@ export function ExportStep() {
         </div>
 
         <div className="btn-row">
-          <button className="btn primary" onClick={() => void exportPdf()} disabled={models.length === 0 || !!busy}>
-            ⬇ Combined PDF
-          </button>
           <button className="btn primary" onClick={() => void exportDocx()} disabled={models.length === 0 || !!busy}>
             ⬇ Combined Word (.docx)
+          </button>
+          <button className="btn primary" onClick={() => void exportPdf()} disabled={models.length === 0 || !!busy}>
+            ⬇ Combined PDF
           </button>
           <button className="btn" onClick={() => void exportZip()} disabled={models.length === 0 || !!busy}>
             ⬇ Per-room files (.zip)
@@ -212,7 +212,6 @@ function SheetPreview({ model: m }: { model: SheetModel }) {
           <div className="c" style={{ fontWeight: 700, fontSize: '1.2rem' }}>{m.centreName || 'Examination Centre'}</div>
           <div className="c">{m.centreAddress}</div>
           <div className="c" style={{ fontWeight: 700 }}>{m.examName}</div>
-          <div className="c" style={{ fontWeight: 700, textDecoration: 'underline', marginTop: 4 }}>SEATING ARRANGEMENT</div>
           <table>
             <tbody>
               <tr>
@@ -225,7 +224,7 @@ function SheetPreview({ model: m }: { model: SheetModel }) {
               </tr>
               <tr>
                 <td className="lbl">Room No.</td>
-                <td style={{ fontWeight: 700 }}>{m.roomNumber}</td>
+                <td style={{ fontWeight: 700 }}>{m.roomNoDisplay}</td>
               </tr>
               <tr>
                 <td className="lbl">Subject(s) &amp; Code(s)</td>

@@ -75,13 +75,8 @@ function sheetChildren(m: SheetModel): (Paragraph | Table)[] {
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { after: 60 },
-      children: [new TextRun({ text: m.examName, bold: true, font: FONT, size: 24 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
       spacing: { after: 160 },
-      children: [new TextRun({ text: 'SEATING ARRANGEMENT', bold: true, font: FONT, size: 24, underline: {} })],
+      children: [new TextRun({ text: m.examName, bold: true, font: FONT, size: 24 })],
     }),
   ];
 
@@ -94,7 +89,7 @@ function sheetChildren(m: SheetModel): (Paragraph | Table)[] {
   const tableRows = [
     simpleRow('Date & Day', m.dateDay),
     simpleRow('Time', m.timeSlot || m.session),
-    simpleRow('Room No.', m.roomNumber),
+    simpleRow('Room No.', m.roomNoDisplay),
     simpleRow('Subject(s) & Code(s)', m.subjectsSummary),
     new TableRow({ children: [labelCell('Roll Numbers (subject-wise)'), valueCell(rollParagraphs)] }),
     simpleRow('Total Number of Students', String(m.total)),

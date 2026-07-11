@@ -31,7 +31,7 @@ function Shell() {
   return (
     <>
       <header className="app-header">
-        <span className="logo">Seating Studio</span>
+        <span className="logo">HallMap</span>
         <span className="tagline">Exam seating arrangements, from top sheets to printable room sheets</span>
         <span className="spacer" />
         <button

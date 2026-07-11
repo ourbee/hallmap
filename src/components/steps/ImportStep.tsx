@@ -7,6 +7,7 @@ import type { PageLines } from '../../lib/pdfText';
 import { parseTopSheetPages, parsePastedRolls } from '../../lib/parseTopSheet';
 import { parseAllotment } from '../../lib/parseAllotment';
 import { dayOfDate } from '../../lib/exportModel';
+import { splitRoll } from '../../lib/rollFormat';
 import { FileDrop } from '../FileDrop';
 
 function textToPages(texts: string[]): PageLines[] {
@@ -23,6 +24,11 @@ export function ImportStep() {
   const [ocrCandidate, setOcrCandidate] = useState<File | null>(null);
 
   const rollExample = state.importPrefs.rollExample;
+
+  // Running tally of everything imported so far, shown beside the example box.
+  const totalRolls = state.topSheets.reduce((n, s) => n + s.rolls.length, 0);
+  const pageCount = new Set(state.topSheets.map((s) => `${s.sourceFile}|${s.sourcePage}`)).size;
+  const rollCodeCount = new Set(state.topSheets.flatMap((s) => s.rolls.map((r) => splitRoll(r).prefix || r))).size;
 
   const setSheet = (id: string, patch: Partial<TopSheet>) =>
     update({ topSheets: state.topSheets.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
@@ -183,6 +189,12 @@ export function ImportStep() {
               onChange={(e) => update({ importPrefs: { rollExample: e.target.value } })}
             />
           </div>
+          {totalRolls > 0 && (
+            <span className="badge green">
+              {totalRolls} roll number{totalRolls === 1 ? '' : 's'} identified from {pageCount} page
+              {pageCount === 1 ? '' : 's'} and {rollCodeCount} roll code{rollCodeCount === 1 ? '' : 's'}.
+            </span>
+          )}
         </div>
         <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
           If roll numbers aren't being picked up, type one example roll number (e.g. 232035-11-0026) in the box above —

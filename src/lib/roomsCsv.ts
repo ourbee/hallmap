@@ -2,7 +2,7 @@ import type { Room } from '../types';
 import { makeId } from './id';
 
 export const ROOMS_CSV_HEADER =
-  'Room Number,Capacity,Building/Floor,Benches (optional),Seats per Bench (optional),Active (yes/no)';
+  'Room Number,Capacity,Building/Floor,Benches (optional),Seats per Bench (optional),Available (yes/no)';
 
 export function roomsTemplateCsv(): string {
   return [

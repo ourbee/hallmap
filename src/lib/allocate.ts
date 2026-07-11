@@ -4,13 +4,15 @@ export function roomCapacity(room: Room): number {
   return room.capacity;
 }
 
-// Sequential fill: sort rooms by number, walk subject groups in top-sheet order,
-// fill each room to capacity, splitting a group across rooms when needed.
-// Locked plans are preserved; their rolls are removed from the pool first.
+const byRoomNumber = (a: Room, b: Room) => a.number.localeCompare(b.number, undefined, { numeric: true });
+
+// Allocation goals, in order:
+//  1. use as few rooms as possible (largest available rooms are chosen first);
+//  2. keep all students of a subject in one room — a subject is split across
+//     rooms only when no chosen room can hold it whole (eases script collection);
+//  3. locked plans are preserved; their rolls are removed from the pool first.
 export function allocateRooms(rooms: Room[], sheets: TopSheet[], lockedPlans: RoomPlan[] = []): RoomPlan[] {
-  const activeRooms = rooms
-    .filter((r) => r.active)
-    .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+  const activeRooms = rooms.filter((r) => r.active).sort(byRoomNumber);
 
   const lockedByRoom = new Map(lockedPlans.filter((p) => p.locked).map((p) => [p.roomId, p]));
   const lockedRolls = new Set<string>();
@@ -19,43 +21,75 @@ export function allocateRooms(rooms: Room[], sheets: TopSheet[], lockedPlans: Ro
   }
 
   // Remaining pool, in sheet order, minus rolls already seated in locked rooms
-  const queue: SubjectGroup[] = sheets
+  const pool: SubjectGroup[] = sheets
     .map((s) => ({
       topSheetId: s.id,
       subjectCode: s.subjectCode || s.paper || 'SUBJECT',
       rolls: s.rolls.filter((r) => !lockedRolls.has(r)),
     }))
     .filter((g) => g.rolls.length > 0);
+  const totalStudents = pool.reduce((n, g) => n + g.rolls.length, 0);
 
-  const plans: RoomPlan[] = [];
-  let qi = 0;
-  let offset = 0; // position within current group
+  // Fewest rooms: take the largest unlocked rooms until capacity covers everyone.
+  const candidates = activeRooms.filter((r) => !lockedByRoom.has(r.id));
+  const byCapacityDesc = [...candidates].sort((a, b) => b.capacity - a.capacity || byRoomNumber(a, b));
+  const chosen: Room[] = [];
+  let chosenCapacity = 0;
+  for (const room of byCapacityDesc) {
+    if (chosenCapacity >= totalStudents) break;
+    chosen.push(room);
+    chosenCapacity += roomCapacity(room);
+  }
+  chosen.sort(byRoomNumber);
 
-  for (const room of activeRooms) {
-    const locked = lockedByRoom.get(room.id);
-    if (locked) {
-      plans.push(locked);
-      continue;
+  const free = new Map(chosen.map((r) => [r.id, roomCapacity(r)]));
+  const groupsByRoom = new Map<string, SubjectGroup[]>(chosen.map((r) => [r.id, []]));
+
+  // Whole-subject placement: biggest subjects first, each into the room whose
+  // remaining space fits it most tightly (leaves big gaps for big subjects).
+  const bySizeDesc = [...pool].sort((a, b) => b.rolls.length - a.rolls.length);
+  const unplaced: SubjectGroup[] = [];
+  for (const g of bySizeDesc) {
+    let best: Room | null = null;
+    for (const room of chosen) {
+      const f = free.get(room.id)!;
+      if (f >= g.rolls.length && (best === null || f < free.get(best.id)!)) best = room;
     }
-    let remaining = roomCapacity(room);
-    const groups: SubjectGroup[] = [];
-    while (remaining > 0 && qi < queue.length) {
-      const g = queue[qi];
-      const take = Math.min(remaining, g.rolls.length - offset);
-      if (take > 0) {
-        groups.push({ topSheetId: g.topSheetId, subjectCode: g.subjectCode, rolls: g.rolls.slice(offset, offset + take) });
-        remaining -= take;
-        offset += take;
-      }
-      if (offset >= g.rolls.length) {
-        qi += 1;
-        offset = 0;
-      }
+    if (best) {
+      groupsByRoom.get(best.id)!.push(g);
+      free.set(best.id, free.get(best.id)! - g.rolls.length);
+    } else {
+      unplaced.push(g);
     }
-    plans.push({ roomId: room.id, groups, locked: false });
   }
 
-  return plans;
+  // Whatever could not fit whole is split across the largest remaining gaps.
+  for (const g of unplaced) {
+    let offset = 0;
+    const gaps = [...chosen].sort((a, b) => free.get(b.id)! - free.get(a.id)! || byRoomNumber(a, b));
+    for (const room of gaps) {
+      if (offset >= g.rolls.length) break;
+      const take = Math.min(free.get(room.id)!, g.rolls.length - offset);
+      if (take <= 0) continue;
+      groupsByRoom.get(room.id)!.push({ ...g, rolls: g.rolls.slice(offset, offset + take) });
+      free.set(room.id, free.get(room.id)! - take);
+      offset += take;
+    }
+    // Anything still left over is unseated (session larger than total capacity);
+    // the validation warnings surface that.
+  }
+
+  // Emit plans for every active room in number order, listing each room's
+  // subjects in top-sheet order.
+  const sheetOrder = new Map(sheets.map((s, i) => [s.id, i]));
+  return activeRooms.map((room) => {
+    const locked = lockedByRoom.get(room.id);
+    if (locked) return locked;
+    const groups = (groupsByRoom.get(room.id) ?? []).sort(
+      (a, b) => (sheetOrder.get(a.topSheetId) ?? 0) - (sheetOrder.get(b.topSheetId) ?? 0),
+    );
+    return { roomId: room.id, groups, locked: false };
+  });
 }
 
 export function unassignedCount(sheets: TopSheet[], plans: RoomPlan[]): number {

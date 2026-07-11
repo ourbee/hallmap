@@ -6,6 +6,9 @@ export interface RollBlock {
   subjectCode: string;
   count: number;
   lines: string[];
+  // Raw rolls kept so a renderer can re-pack lines at a different width
+  // (the PDF shrinks the font when a room has many roll numbers).
+  rolls: string[];
 }
 
 export interface SheetModel {
@@ -16,7 +19,11 @@ export interface SheetModel {
   timeSlot: string; // session + entered time, e.g. "MORNING, 10:00 A.M. – 12:00 Noon"
   session: string;
   roomNumber: string;
+  // What the "Room No." row prints — notice copies add the building/floor,
+  // e.g. "101 (Ground Floor)", for students new to the centre.
+  roomNoDisplay: string;
   subjectsSummary: string; // e.g. "MPLS (18); MSOC (4);"
+  rollDisplay: RollDisplay;
   rollBlocks: RollBlock[];
   total: number;
   benchPlan: BenchPlan | null;
@@ -55,6 +62,7 @@ export function buildSheetModel(
     subjectCode: g.subjectCode,
     count: g.rolls.length,
     lines: rollLines(g.rolls, opts.display, MAX_LINE_CHARS),
+    rolls: g.rolls,
   }));
   const total = plan.groups.reduce((n, g) => n + g.rolls.length, 0);
   const examName = state.exam.name + (state.exam.scheme ? ` (${state.exam.scheme})` : '');
@@ -68,7 +76,10 @@ export function buildSheetModel(
     timeSlot,
     session: arrangement.session,
     roomNumber: room.number,
+    roomNoDisplay:
+      opts.copyType === 'notice' && room.building.trim() ? `${room.number} (${room.building.trim()})` : room.number,
     subjectsSummary,
+    rollDisplay: opts.display,
     rollBlocks,
     total,
     benchPlan: opts.content === 'seating' ? null : buildBenchPlan(plan, room, arrangement.benchMode),
