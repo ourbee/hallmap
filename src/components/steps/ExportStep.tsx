@@ -76,6 +76,29 @@ export function ExportStep() {
     setBusy('');
   };
 
+  const exportJson = () => {
+    setBusy('Building JSON…');
+    // Fixed options so the JSON always carries every room's full seating data,
+    // independent of the copy/content/roll-display toggles above.
+    const jsonModels = buildAllSheetModels(state, arrangement, {
+      display: 'full',
+      copyType: 'invigilator',
+      content: 'seating',
+    });
+    const payload = {
+      date: arrangement.date,
+      session: arrangement.session,
+      rooms: jsonModels.map((m) => ({
+        roomNo: m.roomNumber,
+        strength: m.total,
+        subjects: m.rollBlocks.map((b) => `${b.subjectCode} (${b.count})`),
+      })),
+    };
+    const jsonName = `seating-${arrangement.date.replace(/\//g, '-')}-${arrangement.session.toLowerCase()}-rooms.json`;
+    saveAs(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }), jsonName);
+    setBusy('');
+  };
+
   const hasBenchData = arrangement
     ? arrangement.roomPlans.some((p) => {
         const room = state.rooms.find((r) => r.id === p.roomId);
@@ -177,6 +200,14 @@ export function ExportStep() {
           </button>
           <button className="btn" onClick={() => void exportZip()} disabled={models.length === 0 || !!busy}>
             ⬇ Per-room files (.zip)
+          </button>
+          <button
+            className="btn"
+            onClick={exportJson}
+            disabled={models.length === 0 || !!busy}
+            title="Room-wise summary (room, strength, subjects) — upload straight into InvigiRoster"
+          >
+            ⬇ JSON (for InvigiRoster)
           </button>
           {busy && <span className="progress-note">{busy}</span>}
         </div>
