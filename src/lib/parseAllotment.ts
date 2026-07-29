@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import type { AllotmentRange, CentreProfile } from '../types';
 import type { PageLines } from './pdfText';
 import { makeId } from './id';

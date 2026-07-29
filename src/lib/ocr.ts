@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // OCR fallback for scanned PDFs. tesseract.js is heavy, so it is only loaded
 // when the user explicitly asks for OCR.
 

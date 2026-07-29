@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 :root {
   --bg: #f4f6fa;
   --surface: #ffffff;
@@ -407,6 +412,20 @@ details.bench-details summary {
 .footer-note a {
   color: var(--primary-dark);
   font-weight: 600;
+  text-decoration: underline;
+}
+
+.footer-note a:hover,
+.footer-note a:focus-visible {
+  text-decoration-thickness: 2px;
+  opacity: 0.8;
+}
+
+.footer-copyright {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  opacity: 0.75;
 }
 
 .checkbox-line {

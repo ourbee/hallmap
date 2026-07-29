@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import { useState } from 'react';
 import { StoreProvider, useStore } from './state/store';
 import { SetupStep } from './components/steps/SetupStep';
@@ -77,6 +82,8 @@ function Shell() {
         <a href="https://github.com/ourbee" target="_blank" rel="noopener noreferrer">
           Ritwik Balo
         </a>
+        <br />
+        <span className="footer-copyright">© 2026 Ritwik Balo. All rights reserved.</span>
       </p>
     </>
   );

@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import type { BenchMode, BenchPlan, Room, RoomPlan, SubjectGroup, TopSheet } from '../types';
 
 export function roomCapacity(room: Room): number {

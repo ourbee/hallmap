@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import type { AppState, Arrangement, BenchPlan, CopyType, ExportContent, RollDisplay, Room, RoomPlan } from '../types';
 import { buildBenchPlan } from './allocate';
 import { rollLines } from './rollFormat';

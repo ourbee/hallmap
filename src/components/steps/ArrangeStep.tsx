@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import type { Arrangement, BenchMode, RoomPlan, TopSheet } from '../../types';

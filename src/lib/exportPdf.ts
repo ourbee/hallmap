@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import { jsPDF } from 'jspdf';
 import type { SheetModel } from './exportModel';
 import { rollLines } from './rollFormat';

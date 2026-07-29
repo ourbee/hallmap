@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Harness for feedback round 2: allocation (fewest rooms, whole subjects)
 // and PDF pagination/auto-shrink. Writes PDFs to the scratch dir for review.
 import { writeFileSync } from 'node:fs';

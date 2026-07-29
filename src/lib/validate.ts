@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import type { AllotmentRange, Room, RoomPlan, TopSheet } from '../types';
 import { splitRoll } from './rollFormat';
 

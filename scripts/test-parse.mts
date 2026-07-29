@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Node harness: runs the app's real parsers against sample PDFs.
 // Usage: npx tsx scripts/test-parse.mts
 import { readFileSync } from 'node:fs';

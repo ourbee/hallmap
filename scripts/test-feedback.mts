@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 import { patternFromExample, extractRolls } from '../src/lib/parseTopSheet';
 import { rollLines } from '../src/lib/rollFormat';
 

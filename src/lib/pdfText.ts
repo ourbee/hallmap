@@ -1,3 +1,8 @@
+/*
+ * Copyright © 2026 Ritwik Balo. All rights reserved.
+ * https://github.com/ourbee
+ */
+
 // Position-aware text extraction shared by the browser app and the Node test harness.
 // Groups pdf.js text items into visual lines (top-to-bottom, left-to-right).
 
